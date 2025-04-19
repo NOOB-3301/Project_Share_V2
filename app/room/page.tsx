@@ -162,7 +162,8 @@ export default function RoomPage() {
           receivedMetadata.current = parsed.metadata;
           receivedSize.current = 0;
           setReceiveProgress(0);
-  
+
+          //import streamsaver dyammcally for fixing ssr, it is gigivng document not found error
           // Create stream
           const stereamsaver = (await import('streamsaver')).default
           const fileStreamObj = stereamsaver.createWriteStream(parsed.metadata.name, {
