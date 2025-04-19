@@ -9,6 +9,9 @@ import {
   setDoc,
   addDoc,
   onSnapshot,
+  getDoc,
+  updateDoc,
+  getDocs,
 } from "firebase/firestore";
 
 export default function RoomPage() {
@@ -35,10 +38,13 @@ export default function RoomPage() {
     const answerCandidates = collection(callDocRef, "answerCandidates");
 
     setCallId(callDocRef.id);
+    newPc.createDataChannel("chat");
 
     // Collect ICE candidates
     newPc.onicecandidate = async (event) => {
+      console.log(event)
       if (event.candidate) {
+        console.log("new icecandidate", event.candidate)
         await addDoc(offerCandidates, event.candidate.toJSON());
       }
     };
@@ -84,8 +90,38 @@ export default function RoomPage() {
             await addDoc(answerCandidates, event.candidate.toJSON())
         }
     } 
+    const calldata = (await getDoc(calldoc)).data()
+
+    console.log(calldata)
+    const offerDescription = calldata?.offer
+
+    await pc?.setRemoteDescription(new RTCSessionDescription(offerDescription))
+
+    const answerDescription = await pc?.createAnswer()
+    await pc?.setLocalDescription(answerDescription)
+
+    console.log(answerDescription)
+
+    const answer={
+      type: answerDescription?.type,
+      sdp: answerDescription?.sdp
+    }
+
+    await updateDoc(calldoc,answer)
   }
 
+  const handlefirestore =async()=>{
+    const docs = await getDocs(collection(db, 'calls'))
+    docs.forEach(async doc =>{
+      console.log(doc.id)
+      const subcollection = await getDocs(collection(db, 'calls', doc.id, 'offerCandidates'))
+      console.log(subcollection)
+      subcollection.forEach(collection=>{
+        console.log(collection.data())
+      })
+    })
+
+  }
   return (
     <div className="h-screen w-screen flex flex-col justify-center items-center space-y-4">
       <div className="text-center text-lg font-semibold">
@@ -98,8 +134,10 @@ export default function RoomPage() {
         Create Offer
       </button>
       {callId && <div>Call ID: <code>{callId}</code></div>}
-      <input type="text" placeholder="Call ID"/>
+      <input value={callId} type="text" placeholder="Call ID"/>
       <button onClick={handleAnwserCall}>Answer Call</button>
+
+      <button onClick={handlefirestore}>Get docs</button>
     </div>
   );
 }
