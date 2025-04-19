@@ -14,7 +14,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import streamSaver from 'streamsaver'
-import fs from "node:fs"
+
 
 export default function RoomPage() {
   const { id } = useParams();
@@ -208,64 +208,61 @@ export default function RoomPage() {
       size: file.size,
     };
   
-    // Check if data channel is open
+    // Send metadata
     if (dataChannel.readyState !== "open") {
       alert("Data channel is not open yet. Please try again.");
       return;
     }
   
-    // Send metadata first
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
   
-    const stream = file.stream();
-    const reader = stream.getReader();
-  
-    const chunkSize = 216 * 1024; // 216 KB chunks
-    let sentBytes = 0;
+    const chunkSize = 216 * 1024; 
+    let offset = 0;
+    const reader = new FileReader();
   
     setIsUploading(true);
   
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
+    const readSlice = (o: number) => {
+      const slice = file.slice(o, o + chunkSize);
+      reader.readAsArrayBuffer(slice);
+    };
   
-        if (done) break;
+    reader.onload = async (e) => {
+      if (!dataChannel || dataChannel.readyState !== "open") {
+        console.warn("Data channel closed during transfer.");
+        setIsUploading(false);
+        return;
+      }
   
-        // Wait for buffer to clear (backpressure)
+      if (e.target?.result && e.target.result instanceof ArrayBuffer) {
+        // Backpressure
         while (dataChannel.bufferedAmount > 8 * 1024 * 1024) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
   
-        if (dataChannel.readyState !== "open") {
-          console.warn("Data channel closed during transfer.");
-          break;
+        if (dataChannel.readyState === "open") {
+          dataChannel.send(e.target.result);
+        } else {
+          console.warn("Cannot send: data channel not open");
+          setIsUploading(false);
+          return;
         }
   
-        // Slice value manually to control chunkSize if needed
-        if (value.byteLength > chunkSize) {
-          for (let offset = 0; offset < value.byteLength; offset += chunkSize) {
-            const chunk = value.slice(offset, offset + chunkSize);
-            dataChannel.send(chunk);
-            sentBytes += chunk.byteLength;
-            setUploadProgress(Math.round((sentBytes / file.size) * 100));
-          }
+        offset += e.target.result.byteLength;
+        setUploadProgress(Math.round((offset / file.size) * 100));
+  
+        if (offset < file.size) {
+          readSlice(offset);
         } else {
-          dataChannel.send(value);
-          sentBytes += value.byteLength;
-          setUploadProgress(Math.round((sentBytes / file.size) * 100));
+          dataChannel.send("EOF");
+          console.log("File transfer complete");
+          setIsUploading(false);
         }
       }
+    };
   
-      // Send end-of-file signal
-      dataChannel.send("EOF");
-      console.log("File transfer complete");
-    } catch (err) {
-      console.error("Stream reading failed:", err);
-    } finally {
-      setIsUploading(false);
-    }
+    readSlice(0);
   };
-  
   
   
 
