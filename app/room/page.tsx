@@ -1,6 +1,4 @@
 "use client";
-
-import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { db } from "@/app/firebase";
 import {
@@ -13,10 +11,10 @@ import {
   updateDoc,
   getDocs,
 } from "firebase/firestore";
-import streamSaver from 'streamsaver'
+// import streamSaver from 'streamsaver'
+
 
 export default function RoomPage() {
-  const { id } = useParams();
   const [pc, setPc] = useState<RTCPeerConnection | null>(null);
   const [callId, setCallId] = useState<string>("");
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
@@ -155,7 +153,7 @@ export default function RoomPage() {
     });
   };
 
-  const handleReceiveData = (data: any) => {
+  const handleReceiveData = async(data: any) => {
     console.log(data)
     if (typeof data === "string") {
       try {
@@ -166,7 +164,8 @@ export default function RoomPage() {
           setReceiveProgress(0);
   
           // Create stream
-          const fileStreamObj = streamSaver.createWriteStream(parsed.metadata.name, {
+          const stereamsaver = (await import('streamsaver')).default
+          const fileStreamObj = stereamsaver.createWriteStream(parsed.metadata.name, {
             size: parsed.metadata.size,
           });
           fileStream.current = fileStreamObj.getWriter();
@@ -275,10 +274,6 @@ export default function RoomPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col justify-center items-center space-y-4">
-      <div className="text-center text-lg font-semibold">
-        This is room page: {id}
-      </div>
-
       <button
         onClick={handleCreateOffer}
         className="bg-blue-600 text-white px-4 py-2 rounded"
