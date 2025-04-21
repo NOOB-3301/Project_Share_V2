@@ -9,65 +9,77 @@ import {
     onSnapshot,
     getDoc,
     updateDoc,
-    getDocs,
 } from "firebase/firestore";
 
-
 export default function VideoPage() {
+    const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null);
+    const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null);
 
-    const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null)
-    const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null)
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
-    const [localStream, setLocalStream] = useState<MediaStream | null>(null)
-    const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null)
+    const [callId, setCallId] = useState<string | null>(null);
 
-    const [callId, setCallId] = useState<string | null>(null)
+    const localVideoRef = useRef<HTMLVideoElement | null>(null);
+    const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
+    useEffect(() => {
+        if (localVideoRef.current && localStream) {
+            localVideoRef.current.srcObject = localStream;
+        }
+    }, [localStream]);
+
+    useEffect(() => {
+        if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
 
     const gettwebcam = async () => {
-        const localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        const local = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setLocalStream(local);
 
-        localStream.getTracks().forEach((track) => {
-            if (senderpc) {
-                senderpc.addTrack(track, localStream);
-            }
-            if (answerpc) {
-                answerpc.addTrack(track, localStream);
-            }
-        })
-
-        if (answerpc) {
-            const remoteStream = new MediaStream();
-            setRemoteStream(remoteStream);
-            answerpc.ontrack = (event) => {
-                event.streams[0].getTracks().forEach((track) => {
-                    remoteStream.addTrack(track);
-                });
-            };
-        }
         if (senderpc) {
-            const remoteStream = new MediaStream();
-            setRemoteStream(remoteStream);
-            senderpc.ontrack = (event) => {
-                event.streams[0].getTracks().forEach((track) => {
-                    remoteStream.addTrack(track);
+            console.log("Adding tracks to senderpc", senderpc);
+
+            local.getTracks().forEach(track => senderpc.addTrack(track, local));
+            console.log("Tracks added to senderpc", senderpc);
+        }
+        if (answerpc) {
+            console.log("Adding tracks to answerpc", answerpc);
+            local.getTracks().forEach(track => answerpc.addTrack(track, local));
+            console.log("Tracks added to answerpc", answerpc);
+        }
+
+        const remote = new MediaStream();
+        console.log("Creating remote stream", remote);
+        setRemoteStream(remote);
+
+        const setupOnTrack = (pc: RTCPeerConnection) => {
+            console.log("Setting up ontrack for pc", pc);
+            pc.ontrack = (event) => {
+                event.streams[0].getTracks().forEach(track => {
+                    remote.addTrack(track);
                 });
             };
-        }
-        setLocalStream(localStream);
-    }
-    const createoffer = async () => {
-        const servers = {
-            iceServers: [
-                {
-                    urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
-                },
-            ],
         };
 
+        
+        if (senderpc) {
+            setupOnTrack(senderpc);
+            console.log("after sender", senderpc);
+        };
+        if (answerpc) setupOnTrack(answerpc);
+        console.log("after remote", remote);
+    };
+
+    const createoffer = async () => {
+        const servers = {
+            iceServers: [{ urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"] }],
+        };
         const newPc = new RTCPeerConnection(servers);
-        setSenderpc(newPc)
-        console.log(newPc);
-        console.log(localStream);
+        setSenderpc(newPc);
+
         const callDocRef = doc(collection(db, "calls"));
         const offerCandidates = collection(callDocRef, "offerCandidates");
         const answerCandidates = collection(callDocRef, "answerCandidates");
@@ -81,12 +93,10 @@ export default function VideoPage() {
         };
 
         const offerDescription = await newPc.createOffer();
-        console.log(offerDescription)
         await newPc.setLocalDescription(offerDescription);
 
         await setDoc(callDocRef, { offer: offerDescription });
 
-        // Listen for answer
         onSnapshot(callDocRef, (snapshot) => {
             const data = snapshot.data();
             if (!newPc.currentRemoteDescription && data?.answer) {
@@ -95,7 +105,6 @@ export default function VideoPage() {
             }
         });
 
-        // Listen for remote ICE candidates
         onSnapshot(answerCandidates, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
@@ -104,34 +113,28 @@ export default function VideoPage() {
                 }
             });
         });
-    }
+    };
 
     const answerOffer = async () => {
-        console.log("Answering offer")
         if (!callId) {
-            console.error("No call ID found. Please create an offer first.");
+            console.error("No call ID found.");
             return;
         }
+
         const calldoc = doc(db, "calls", callId);
         const answerCandidates = collection(calldoc, "answerCandidates");
         const offerCandidates = collection(calldoc, "offerCandidates");
+
         const servers = {
-            iceServers: [
-                {
-                    urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"],
-                },
-            ],
+            iceServers: [{ urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"] }], 
         };
-        const anspc = new RTCPeerConnection(servers)
+
+        const anspc = new RTCPeerConnection(servers);
+        console.log("Answering call with server",anspc);
         setAnswerpc(anspc);
-        if (!anspc) {
-            console.error("No RTCPeerConnection instance");
-            return;
-        }
 
         anspc.onicecandidate = async (event) => {
-            console.log("ice candidate")
-            console.log(event)
+            console.log("ICE candidate:", event);
             if (event.candidate) {
                 await addDoc(answerCandidates, event.candidate.toJSON());
             }
@@ -155,40 +158,51 @@ export default function VideoPage() {
                 }
             });
         });
-    }
+
+        const remote = new MediaStream();
+        setRemoteStream(remote);
+
+        // Ensure tracks from the remote peer are added to the remote stream
+        anspc.ontrack = (event) => {
+            console.log(event)
+            event.streams[0].getTracks().forEach(track => {
+                remote.addTrack(track);
+            });
+        };
+    };
 
     return (
-        <div className="w-full min-h-screen bg-white">
-            <h1 className="text-4xl font-bold text-gray-800">Video Page</h1>
-            <button onClick={() => gettwebcam()}>Webcam</button>
-            <br />
-            <button onClick={() => createoffer()}>Create Offer</button>
-            <br />
-            <input className="border-2 border-black" type="text" value={callId ? callId : ""} onChange={(e) => setCallId(e.target.value)} />
-            <button onClick={() => answerOffer()}>Answer Offer</button>
-            <video
-                className="w-1/2"
-                autoPlay
-                playsInline
-                muted
-                ref={(video) => {
-                    if (video && localStream) {
-                        video.srcObject = localStream;
-                    }
-                }}
-            />
-            <video
-                className="w-1/2"
-                autoPlay
-                playsInline
-                ref={(video) => {
-                    if (video && remoteStream) {
-                        video.srcObject = remoteStream;
-                    }
-                }}
-            />
+        <div className="w-full min-h-screen bg-white p-4">
+            <h1 className="text-4xl font-bold text-gray-800 mb-4">Video Page</h1>
 
+            <div className="space-x-2">
+                <button className="px-4 py-2 bg-blue-500 text-white rounded" onClick={gettwebcam}>Get Webcam</button>
+                <button className="px-4 py-2 bg-green-500 text-white rounded" onClick={createoffer}>Create Offer</button>
+                <input
+                    className="border px-2 py-1"
+                    type="text"
+                    placeholder="Call ID"
+                    value={callId || ""}
+                    onChange={(e) => setCallId(e.target.value)}
+                />
+                <button className="px-4 py-2 bg-purple-500 text-white rounded" onClick={answerOffer}>Answer</button>
+            </div>
 
+            <div className="flex mt-8 gap-4">
+                <video
+                    className="w-1/2 border-2 border-blue-500 rounded"
+                    ref={localVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                />
+                <video
+                    className="w-1/2 border-2 border-green-500 rounded"
+                    ref={remoteVideoRef}
+                    autoPlay
+                    playsInline
+                />
+            </div>
         </div>
-    )
+    );
 }
