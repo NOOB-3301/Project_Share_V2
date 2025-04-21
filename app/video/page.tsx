@@ -15,6 +15,10 @@ import { Video, PhoneCall, PhoneOff, VideoOff, Phone } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
 
 export default function VideoPage() {
+
+  const [isAnswering, setIsAnswering] = useState(false);
+
+
   const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null);
   const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null);
 
@@ -46,10 +50,10 @@ export default function VideoPage() {
     setLocalStream(local);
   };
   
-  const notify = ()=> toast("Data Channel Opened, Share the Call ID With Your Friend for File Transfer !!")
+  const notify = (text:string)=> toast(`${text}`)
   const createOffer = async () => {
     if (!localStream){
-        notify()
+        notify("First Get The Camera Access to start Sharing!!!")
         return;  
     } 
     const servers = {
@@ -99,10 +103,15 @@ export default function VideoPage() {
     });
 
     setSenderpc(newPc);
+    notify("Call Created Successfully!!!")
   };
 
   const answerOffer = async () => {
-    if (!callId || !localStream) return;
+      if (!callId || !localStream){
+          notify("Get The Camera Access and CallId to start Sharing and Answer the Call.....")
+          return;
+        } 
+    setIsAnswering(true);
     const calldoc = doc(db, "calls", callId);
     const answerCandidates = collection(calldoc, "answerCandidates");
     const offerCandidates = collection(calldoc, "offerCandidates");
@@ -145,6 +154,8 @@ export default function VideoPage() {
     });
 
     setAnswerpc(anspc);
+    setIsAnswering(false);
+    notify("Call Answered Successfully!!!")
   };
 
   const endCall = () => {
@@ -157,6 +168,8 @@ export default function VideoPage() {
     setLocalStream(null);
     setRemoteStream(null);
     setCallId(null);
+    setIsAnswering(false);
+    notify("Call Ended Successfully!!!")
   };
 
   return (
@@ -191,12 +204,21 @@ export default function VideoPage() {
           className="px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-48"
         />
 
-        <button
-          onClick={answerOffer}
-          className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <Phone size={18} /> Answer
-        </button>
+        {isAnswering ? (
+          <button
+            disabled
+            className="flex items-center gap-2 bg-gray-400 text-white px-4 py-2 rounded-lg shadow-sm transition cursor-not-allowed"
+          >
+            <Phone size={18} /> Answering...
+          </button>
+        ) : (
+          <button
+            onClick={answerOffer}
+            className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow-sm transition"
+          >
+            <Phone size={18} /> Answer Call
+          </button>
+        )}
 
         <button
           onClick={endCall}
@@ -221,6 +243,7 @@ export default function VideoPage() {
           className="w-full md:w-1/2 border-4 border-green-400 rounded-2xl shadow-lg"
         />
       </div>
+      <ToastContainer/>
     </motion.div>
   );
 }
