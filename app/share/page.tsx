@@ -15,10 +15,13 @@ import {
 import { UploadCloud, PhoneCall, PhoneIncoming, HomeIcon } from 'lucide-react';
 import { toast, ToastContainer } from "react-toastify";
 import DraggableChatWindow from "../components/SharePage/ChatWindow";
-
+import { useRouter } from "next/navigation";
 
 
 export default function RoomPage() {
+
+  const router = useRouter()
+
   const [pc, setPc] = useState<RTCPeerConnection | null>(null);
   const [callId, setCallId] = useState<string>("");
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
@@ -404,12 +407,11 @@ export default function RoomPage() {
 
           <button
             className="flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl shadow hover:bg-purple-700 transition"
-            onClick={()=> hanndlechat()}
+            onClick={()=> router.push('/video')}
           >
-            Video Button
+            Start Video Chat
           </button>
         </div>
-        {/* ):(null)} */}
       </div>
       <ToastContainer/>
         {chatChannel && (
