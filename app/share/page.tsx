@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 // import streamSaver from 'streamsaver'
 import { UploadCloud, PhoneCall, PhoneIncoming } from 'lucide-react';
+import { toast, ToastContainer } from "react-toastify";
 
 
 
@@ -29,6 +30,20 @@ export default function RoomPage() {
   const fileStream = useRef<WritableStreamDefaultWriter | null>(null);
 
 
+  const [anspc, setAnspc] = useState<RTCPeerConnection | null>(null)
+  const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null)
+
+  const logpc =()=>{
+    console.log("answers pc",anspc)
+    console.log("sender",senderpc)
+    anspc?.close()
+    setAnspc(null)
+    senderpc?.close()
+    setSenderpc(null)
+  }
+
+  const notify = ()=> toast("Data Channel Opened, Share the Call ID With Your Friend for File Transfer !!")
+
   const handleCreateOffer = async () => {
     const servers = {
       iceServers: [
@@ -40,6 +55,7 @@ export default function RoomPage() {
 
     const newPc = new RTCPeerConnection(servers);
     setPc(newPc);
+    setSenderpc(newPc)
 
     // ✅ Create data channel
     const channel = newPc.createDataChannel("fileTransfer", { ordered: true, maxRetransmits: 0 });
@@ -99,14 +115,14 @@ export default function RoomPage() {
         },
       ],
     };
-    const pc = new RTCPeerConnection(servers)
-
-    if (!pc) {
+    const anspc = new RTCPeerConnection(servers)
+    setAnspc(anspc);
+    if (!anspc) {
       console.error("No RTCPeerConnection instance");
       return;
     }
 
-    pc.onicecandidate = async (event) => {
+    anspc.onicecandidate = async (event) => {
       console.log("ice candidate")
       console.log(event)
       if (event.candidate) {
@@ -115,24 +131,26 @@ export default function RoomPage() {
     };
 
     // ✅ Receive data channel
-    pc.ondatachannel = (event) => {
+    anspc.ondatachannel = (event) => {
       console.log("hit from datachannel")
       console.log("event", event)
       const channel = event.channel;
       console.log("answer", channel)
       setDataChannel(channel);
 
-      channel.onopen = () => console.log("Data channel opened (Answerer)");
+      channel.onopen = () => {
+        console.log("Data channel opened (Answerer)");
+      }
       channel.onmessage = (event) => handleReceiveData(event.data);
     };
 
     const callData = (await getDoc(calldoc)).data();
     const offerDescription = callData?.offer;
 
-    await pc.setRemoteDescription(new RTCSessionDescription(offerDescription));
+    await anspc.setRemoteDescription(new RTCSessionDescription(offerDescription));
 
-    const answerDescription = await pc.createAnswer();
-    await pc.setLocalDescription(answerDescription);
+    const answerDescription = await anspc.createAnswer();
+    await anspc.setLocalDescription(answerDescription);
 
     await updateDoc(calldoc, { answer: answerDescription });
 
@@ -140,10 +158,12 @@ export default function RoomPage() {
       snapshot.docChanges().forEach((change) => {
         if (change.type === "added") {
           const candidate = new RTCIceCandidate(change.doc.data());
-          pc.addIceCandidate(candidate);
+          anspc.addIceCandidate(candidate);
         }
       });
     });
+
+    notify()
   };
 
   const handleReceiveData = async (data: any) => {
@@ -190,7 +210,6 @@ export default function RoomPage() {
       }
     }
   };
-
 
   const handleSendFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -262,6 +281,12 @@ export default function RoomPage() {
     }
   };
 
+  useEffect(() => {
+    if (dataChannel) {
+      console.log(dataChannel)
+    }
+  }, [dataChannel]);
+
   return (
     <div className="min-h-screen w-full flex flex-col justify-center items-center space-y-6 p-4 bg-gray-50">
       <div className="max-w-md w-full space-y-6 bg-white p-6 rounded-2xl shadow-md">
@@ -323,6 +348,17 @@ export default function RoomPage() {
           </div>
         )}
 
+        {isUploading && (
+          <button onClick={() =>{logpc(); setIsUploading(false); setUploadProgress(0);}} className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 transition">
+            <UploadCloud className="w-5 h-5" />
+            Close Transfer
+          </button>
+          // <button onClick={() => {logpc()}} className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 transition">
+          //   <UploadCloud className="w-5 h-5" />
+          //   Close Transfer
+          // </button>
+        )}
+
         {receiveProgress > 0 && receiveProgress < 100 && (
           <div className="w-full">
             <div className="bg-gray-200 h-4 rounded-full overflow-hidden">
@@ -336,7 +372,9 @@ export default function RoomPage() {
             </div>
           </div>
         )}
+
       </div>
+      <ToastContainer/>
     </div>
   );
 }
