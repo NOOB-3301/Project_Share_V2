@@ -12,8 +12,9 @@ import {
   getDocs,
 } from "firebase/firestore";
 // import streamSaver from 'streamsaver'
-import { UploadCloud, PhoneCall, PhoneIncoming } from 'lucide-react';
+import { UploadCloud, PhoneCall, PhoneIncoming, HomeIcon } from 'lucide-react';
 import { toast, ToastContainer } from "react-toastify";
+import DraggableChatWindow from "../components/SharePage/ChatWindow";
 
 
 
@@ -74,7 +75,7 @@ export default function RoomPage() {
     channel.onopen = () => console.log("Data channel opened");
     chatChannel.onopen = () => console.log("Chat channel opened");
     channel.onmessage = (event) => handleReceiveData(event.data);
-
+    channel.onmessage = (e) =>{console.log("message from data channel",e)}
     const callDocRef = doc(collection(db, "calls"));
     const offerCandidates = collection(callDocRef, "offerCandidates");
     const answerCandidates = collection(callDocRef, "answerCandidates");
@@ -313,6 +314,10 @@ export default function RoomPage() {
 
 
   return (
+    <>
+      <div className="absolute top-4 left-4 cursor-pointer" onClick={() => window.location.href = '/'}>
+        <HomeIcon size={24}/>
+      </div>
     <div className="min-h-screen w-full flex flex-col justify-center items-center space-y-6 p-4 bg-gray-50">
       <div className="max-w-md w-full space-y-6 bg-white p-6 rounded-2xl shadow-md">
         <h1 className="text-2xl font-bold text-center">Peer-to-Peer File Transfer</h1>
@@ -395,15 +400,23 @@ export default function RoomPage() {
         )}
 
         {/* {isUploading || receiveProgress > 0 ? ( */}
-          <button
-          onClick={()=> hanndlechat()}
-          >
-            Chat Button
-          </button>
-        {/* ):(null)} */}
+        <div className="w-full flex items-center justify-center space-x-2 mt-4">
 
+          <button
+            className="flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl shadow hover:bg-purple-700 transition"
+            onClick={()=> hanndlechat()}
+          >
+            Video Button
+          </button>
+        </div>
+        {/* ):(null)} */}
       </div>
       <ToastContainer/>
+        {chatChannel && (
+          <DraggableChatWindow chatChannel={chatChannel}  />
+        )}
     </div>
+   </>
+
   );
 }
