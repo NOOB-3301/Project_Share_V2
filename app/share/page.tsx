@@ -29,10 +29,13 @@ export default function RoomPage() {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const fileStream = useRef<WritableStreamDefaultWriter | null>(null);
 
-
   const [anspc, setAnspc] = useState<RTCPeerConnection | null>(null)
   const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null)
 
+
+  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null)
+
+//logging and closing peer connection
   const logpc =()=>{
     console.log("answers pc",anspc)
     console.log("sender",senderpc)
@@ -59,10 +62,17 @@ export default function RoomPage() {
 
     // ✅ Create data channel
     const channel = newPc.createDataChannel("fileTransfer", { ordered: true, maxRetransmits: 0 });
+
+    //craete chat chanenl
+    const chatChannel = newPc.createDataChannel("chat", { ordered: true, maxRetransmits: 0 });
+    console.log("this is chat channel",chatChannel)
+
     console.log(channel)
     setDataChannel(channel);
+    setChatChannel(chatChannel)
 
     channel.onopen = () => console.log("Data channel opened");
+    chatChannel.onopen = () => console.log("Chat channel opened");
     channel.onmessage = (event) => handleReceiveData(event.data);
 
     const callDocRef = doc(collection(db, "calls"));
@@ -134,14 +144,28 @@ export default function RoomPage() {
     anspc.ondatachannel = (event) => {
       console.log("hit from datachannel")
       console.log("event", event)
-      const channel = event.channel;
-      console.log("answer", channel)
-      setDataChannel(channel);
 
-      channel.onopen = () => {
-        console.log("Data channel opened (Answerer)");
+      if (event.channel.label === 'fileTransfer') {
+        console.log("file transfer channnel")
+        const channel = event.channel;
+        console.log("answer", channel)
+        setDataChannel(channel);
+  
+        channel.onopen = () => {
+          console.log("Data channel opened (Answerer)");
+        }
+        channel.onmessage = (event) => handleReceiveData(event.data);
+
+      }else if (event.channel.label === 'chat') {
+        console.log("chat channel")
+        const chatChannel = event.channel;
+        setChatChannel(chatChannel)
+
+        chatChannel.onopen = () => {
+          console.log("Chat channel opened (Answerer)");
+        }
       }
-      channel.onmessage = (event) => handleReceiveData(event.data);
+
     };
 
     const callData = (await getDoc(calldoc)).data();
@@ -167,7 +191,7 @@ export default function RoomPage() {
   };
 
   const handleReceiveData = async (data: any) => {
-    console.log(data)
+    console.log("data is receiving")
     if (typeof data === "string") {
       try {
         const parsed = JSON.parse(data);
@@ -262,7 +286,7 @@ export default function RoomPage() {
 
             sentBytes += chunk.byteLength;
             setUploadProgress(Math.round((sentBytes / file.size) * 100));
-            console.log("sent: ", chunk)
+            console.log("chunk sent")
           }
         } else {
           dataChannel.send(value);
@@ -281,11 +305,12 @@ export default function RoomPage() {
     }
   };
 
-  useEffect(() => {
-    if (dataChannel) {
-      console.log(dataChannel)
-    }
-  }, [dataChannel]);
+  const hanndlechat = () => {
+    console.log("chatting")
+    console.log('this is chatChannel from handlechat',chatChannel)
+  }
+
+
 
   return (
     <div className="min-h-screen w-full flex flex-col justify-center items-center space-y-6 p-4 bg-gray-50">
@@ -353,10 +378,6 @@ export default function RoomPage() {
             <UploadCloud className="w-5 h-5" />
             Close Transfer
           </button>
-          // <button onClick={() => {logpc()}} className="w-full flex items-center justify-center space-x-2 bg-red-600 text-white px-4 py-2 rounded-xl shadow hover:bg-red-700 transition">
-          //   <UploadCloud className="w-5 h-5" />
-          //   Close Transfer
-          // </button>
         )}
 
         {receiveProgress > 0 && receiveProgress < 100 && (
@@ -372,6 +393,14 @@ export default function RoomPage() {
             </div>
           </div>
         )}
+
+        {/* {isUploading || receiveProgress > 0 ? ( */}
+          <button
+          onClick={()=> hanndlechat()}
+          >
+            Chat Button
+          </button>
+        {/* ):(null)} */}
 
       </div>
       <ToastContainer/>
