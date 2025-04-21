@@ -12,6 +12,8 @@ import {
   getDocs,
 } from "firebase/firestore";
 // import streamSaver from 'streamsaver'
+import { UploadCloud, PhoneCall, PhoneIncoming } from 'lucide-react';
+
 
 
 export default function RoomPage() {
@@ -19,20 +21,11 @@ export default function RoomPage() {
   const [callId, setCallId] = useState<string>("");
   const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
   const receivedBuffers = useRef<Blob[]>([]);
-  // const [receivedFileURL, setReceivedFileURL] = useState<string | null>(null);
-
-  const receivedMetadata = useRef<{ name: string; type: string; size:number } | null>(null);
-  const [downloadFilename, setDownloadFilename] = useState<string>("received-file");
-
-
-  const [sendProgress, setSendProgress] = useState<number>(0);
+  const receivedMetadata = useRef<{ name: string; type: string; size: number } | null>(null);
   const [receiveProgress, setReceiveProgress] = useState<number>(0);
-
   const receivedSize = useRef<number>(0);
-
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState<boolean>(false);
-
   const fileStream = useRef<WritableStreamDefaultWriter | null>(null);
 
 
@@ -49,7 +42,7 @@ export default function RoomPage() {
     setPc(newPc);
 
     // ✅ Create data channel
-    const channel = newPc.createDataChannel("fileTransfer",{ordered:true,maxRetransmits:0});
+    const channel = newPc.createDataChannel("fileTransfer", { ordered: true, maxRetransmits: 0 });
     console.log(channel)
     setDataChannel(channel);
 
@@ -153,7 +146,7 @@ export default function RoomPage() {
     });
   };
 
-  const handleReceiveData = async(data: any) => {
+  const handleReceiveData = async (data: any) => {
     console.log(data)
     if (typeof data === "string") {
       try {
@@ -182,14 +175,14 @@ export default function RoomPage() {
         }
       }
     }
-  
+
     // Binary chunk
     if (fileStream.current) {
-      
+
       const chunk = new Uint8Array(data);
       fileStream.current.write(chunk);
       receivedSize.current += chunk.byteLength;
-  
+
       const total = receivedMetadata.current?.size ?? 0;
       if (total) {
         const percent = Math.floor((receivedSize.current / total) * 100);
@@ -197,51 +190,51 @@ export default function RoomPage() {
       }
     }
   };
-  
+
 
   const handleSendFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !dataChannel) return;
-  
+
     const metadata = {
       name: file.name,
       type: file.type,
       size: file.size,
     };
-  
+
     // Check if data channel is open
     if (dataChannel.readyState !== "open") {
       alert("Data channel is not open yet. Please try again.");
       return;
     }
-  
+
     // Send metadata first
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
-  
+
     const stream = file.stream();
     const reader = stream.getReader();
-  
+
     const chunkSize = 216 * 1024; // 216 KB chunks
     let sentBytes = 0;
-  
+
     setIsUploading(true);
-  
+
     try {
       while (true) {
         const { done, value } = await reader.read();
-  
+
         if (done) break;
-  
+
         // Wait for buffer to clear (backpressure)
         while (dataChannel.bufferedAmount > 8 * 1024 * 1024) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
-  
+
         if (dataChannel.readyState !== "open") {
           console.warn("Data channel closed during transfer.");
           break;
         }
-  
+
         // Slice value manually to control chunkSize if needed
         if (value.byteLength > chunkSize) {
           for (let offset = 0; offset < value.byteLength; offset += chunkSize) {
@@ -258,7 +251,7 @@ export default function RoomPage() {
           setUploadProgress(Math.round((sentBytes / file.size) * 100));
         }
       }
-  
+
       // Send end-of-file signal
       dataChannel.send("EOF");
       console.log("File transfer complete");
@@ -268,71 +261,82 @@ export default function RoomPage() {
       setIsUploading(false);
     }
   };
-  
-  
-  
-
 
   return (
-    <div className="h-screen w-screen flex flex-col justify-center items-center space-y-4">
-      <button
-        onClick={handleCreateOffer}
-        className="bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        Create Offer
-      </button>
+    <div className="min-h-screen w-full flex flex-col justify-center items-center space-y-6 p-4 bg-gray-50">
+      <div className="max-w-md w-full space-y-6 bg-white p-6 rounded-2xl shadow-md">
+        <h1 className="text-2xl font-bold text-center">Peer-to-Peer File Transfer</h1>
+        <p className="text-gray-600 text-center">
+          Create or join a call to start transferring files.
+        </p>
 
-      {callId && (
-        <div>
-          Call ID: <code>{callId}</code>
-        </div>
-      )}
+        <button
+          onClick={handleCreateOffer}
+          className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-xl shadow hover:bg-blue-700 transition"
+        >
+          <PhoneCall className="w-5 h-5" />
+          <span>Create Call</span>
+        </button>
 
-      <input onChange={(e) => setCallId(e.target.value)} value={callId} type="text" placeholder="Call ID" />
-      <button onClick={handleAnwserCall} className="bg-green-600 text-white px-4 py-2 rounded">
-        Answer Call
-      </button>
+        {callId && (
+          <div className="text-center text-sm text-gray-800">
+            Call ID: <code className="text-blue-600 font-mono">{callId}</code>
+          </div>
+        )}
 
-      {/* Upload file to send */}
-      {dataChannel && dataChannel.readyState === "open" && (
-        <div>
-          <input type="file" onChange={handleSendFile} />
-        </div>
-      )}
+        <input
+          type="text"
+          placeholder="Call ID"
+          value={callId}
+          onChange={(e) => setCallId(e.target.value)}
+          className="w-full border rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
 
-      {/* Show download link when file is received */}
-      {/* {receivedFileURL && (
-        <div>
-          <a href={receivedFileURL} download={downloadFilename}>
-            Download Received File
-          </a>
-        </div>
-      )} */}
-{isUploading && (
-  <div className="w-full px-4">
-    <div className="bg-gray-200 h-4 rounded-full overflow-hidden">
-      <div
-        className="bg-blue-600 h-full transition-all duration-300"
-        style={{ width: `${uploadProgress}%` }}
-      />
-    </div>
-    <div className="text-sm text-center mt-1">{uploadProgress}%</div>
-  </div>
-)}
+        <button
+          onClick={handleAnwserCall}
+          className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-xl shadow hover:bg-green-700 transition"
+        >
+          <PhoneIncoming className="w-5 h-5" />
+          <span>Answer Call</span>
+        </button>
 
+        {dataChannel?.readyState === 'open' && (
+          <div className="w-full">
+            <label className="block mb-1 text-sm font-medium text-gray-700">Send a File:</label>
+            <input
+              type="file"
+              onChange={handleSendFile}
+              className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-white file:bg-blue-600 hover:file:bg-blue-700"
+            />
+          </div>
+        )}
 
-{receiveProgress > 0 && receiveProgress < 100 && (
-  <div className="w-full px-4">
-    <div className="bg-gray-200 h-4 rounded-full overflow-hidden">
-      <div
-        className="bg-green-600 h-full transition-all duration-300"
-        style={{ width: `${receiveProgress}%` }}
-      />
-    </div>
-    <div className="text-sm text-center mt-1">{receiveProgress}% Downloading</div>
-  </div>
-)}
+        {isUploading && (
+          <div className="w-full">
+            <div className="bg-gray-200 h-4 rounded-full overflow-hidden">
+              <div
+                className="bg-blue-600 h-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <div className="text-sm text-center mt-1 text-gray-700">{uploadProgress}% Uploading</div>
+          </div>
+        )}
 
+        {receiveProgress > 0 && receiveProgress < 100 && (
+          <div className="w-full">
+            <div className="bg-gray-200 h-4 rounded-full overflow-hidden">
+              <div
+                className="bg-green-600 h-full transition-all duration-300"
+                style={{ width: `${receiveProgress}%` }}
+              />
+            </div>
+            <div className="text-sm text-center mt-1 text-gray-700">
+              {receiveProgress}% Downloading
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
