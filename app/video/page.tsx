@@ -13,15 +13,22 @@ import {
 import { motion } from "framer-motion";
 import { Video, PhoneCall, PhoneOff, VideoOff, Phone } from "lucide-react";
 import { toast, ToastContainer } from "react-toastify";
+import DraggableChatWindow from "../components/SharePage/ChatWindow";
 
 export default function VideoPage() {
 
   const [isAnswering, setIsAnswering] = useState(false);
 
+//for chat management
+  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
+  const [ischatwindowOpen, setIsChatWindowOpen] = useState(false);
 
+//global stet managemnt
   const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null);
   const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null);
 
+
+  //video management
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
 
@@ -41,6 +48,15 @@ export default function VideoPage() {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
+
+  const handlechatwindow = () => {
+    if (chatChannel) {
+      setIsChatWindowOpen(prev => !prev)
+    }else {
+      toast.error("Chat Channel is not open yet!")
+    }
+  }
+  
 
   const getWebcam = async () => {
     const local = await navigator.mediaDevices.getUserMedia({
@@ -62,6 +78,15 @@ export default function VideoPage() {
       ],
     };
     const newPc = new RTCPeerConnection(servers);
+    const newchatChannel = newPc.createDataChannel("chat", {
+      ordered: true,
+      maxRetransmits: 0, // No retries = lower latency
+    });
+    newchatChannel.onopen = () => {
+        console.log("Chat channel opened");
+        notify("Chat channel is now open!");
+    }
+    setChatChannel(newchatChannel);
     localStream.getTracks().forEach((track) => newPc.addTrack(track, localStream));
     const remote = new MediaStream();
     setRemoteStream(remote);
@@ -136,6 +161,15 @@ export default function VideoPage() {
       }
     };
 
+    anspc.ondatachannel = (event) => {
+      const channel = event.channel;
+        channel.onopen = () => {
+            console.log("Chat channel opened", channel);
+            notify("Chat Channel is opened successfully!");
+            setChatChannel(channel);
+        };
+    }
+
     const callData = (await getDoc(calldoc)).data();
     const offerDescription = callData?.offer;
 
@@ -169,6 +203,8 @@ export default function VideoPage() {
     setRemoteStream(null);
     setCallId(null);
     setIsAnswering(false);
+    setChatChannel(null);
+    setIsChatWindowOpen(false);
     notify("Call Ended Successfully!!!")
   };
 
@@ -242,6 +278,22 @@ export default function VideoPage() {
           playsInline
           className="w-full md:w-1/2 border-4 border-green-400 rounded-2xl shadow-lg"
         />
+      </div>
+      <div>
+        {ischatwindowOpen ? (
+            <button onClick={() => handlechatwindow()} className="absolute bottom-20 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm transition">
+                Close Chat Window
+            </button>
+        ) : (
+            <button onClick={() => handlechatwindow()} className="absolute bottom-20 right-6 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-sm transition">
+                Open Chat Window
+            </button>
+        )}
+        
+        {ischatwindowOpen && chatChannel ? (
+            <DraggableChatWindow chatChannel={chatChannel} />
+        ):(null)}
+
       </div>
       <ToastContainer/>
     </motion.div>
