@@ -403,15 +403,6 @@ export default function RoomPage() {
         )}
 
         {/* {isUploading || receiveProgress > 0 ? ( */}
-        <div className="w-full flex items-center justify-center space-x-2 mt-4">
-
-          <button
-            className="flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-xl shadow hover:bg-purple-700 transition"
-            onClick={()=> router.push('/video')}
-          >
-            Start Video Chat
-          </button>
-        </div>
       </div>
       <ToastContainer/>
         {chatChannel && (
