@@ -11,21 +11,28 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { motion } from "framer-motion";
-import { Video, PhoneCall, PhoneOff, VideoOff, Phone } from "lucide-react";
+import { Video, PhoneCall, PhoneOff, VideoOff, Phone, Mic, MicOff, ScreenShare } from "lucide-react";
+import { MessageCircle, X } from "lucide-react";
+
 import { toast, ToastContainer } from "react-toastify";
 import DraggableChatWindow from "../components/SharePage/ChatWindow";
+
 
 export default function VideoPage() {
 
   const [isAnswering, setIsAnswering] = useState(false);
 
-//for chat management
+  //for chat management
   const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
   const [ischatwindowOpen, setIsChatWindowOpen] = useState(false);
 
-//global stet managemnt
+  //global stet managemnt
   const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null);
   const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null);
+
+
+  const [isVideoOn, setIsVideoOn] = useState(true);
+  const [isAudioOn, setIsAudioOn] = useState(true);
 
 
   //video management
@@ -52,11 +59,11 @@ export default function VideoPage() {
   const handlechatwindow = () => {
     if (chatChannel) {
       setIsChatWindowOpen(prev => !prev)
-    }else {
+    } else {
       toast.error("Chat Channel is not open yet!")
     }
   }
-  
+
 
   const getWebcam = async () => {
     const local = await navigator.mediaDevices.getUserMedia({
@@ -65,13 +72,13 @@ export default function VideoPage() {
     });
     setLocalStream(local);
   };
-  
-  const notify = (text:string)=> toast(`${text}`)
+
+  const notify = (text: string) => toast(`${text}`)
   const createOffer = async () => {
-    if (!localStream){
-        notify("First Get The Camera Access to start Sharing!!!")
-        return;  
-    } 
+    if (!localStream) {
+      notify("First Get The Camera Access to start Sharing!!!")
+      return;
+    }
     const servers = {
       iceServers: [
         { urls: ["stun:stun1.l.google.com:19302", "stun:stun2.l.google.com:19302"] },
@@ -83,8 +90,8 @@ export default function VideoPage() {
       maxRetransmits: 0, // No retries = lower latency
     });
     newchatChannel.onopen = () => {
-        console.log("Chat channel opened");
-        notify("Chat channel is now open!");
+      console.log("Chat channel opened");
+      notify("Chat channel is now open!");
     }
     setChatChannel(newchatChannel);
     localStream.getTracks().forEach((track) => newPc.addTrack(track, localStream));
@@ -132,10 +139,10 @@ export default function VideoPage() {
   };
 
   const answerOffer = async () => {
-      if (!callId || !localStream){
-          notify("Get The Camera Access and CallId to start Sharing and Answer the Call.....")
-          return;
-        } 
+    if (!callId || !localStream) {
+      notify("Get The Camera Access and CallId to start Sharing and Answer the Call.....")
+      return;
+    }
     setIsAnswering(true);
     const calldoc = doc(db, "calls", callId);
     const answerCandidates = collection(calldoc, "answerCandidates");
@@ -163,11 +170,11 @@ export default function VideoPage() {
 
     anspc.ondatachannel = (event) => {
       const channel = event.channel;
-        channel.onopen = () => {
-            console.log("Chat channel opened", channel);
-            notify("Chat Channel is opened successfully!");
-            setChatChannel(channel);
-        };
+      channel.onopen = () => {
+        console.log("Chat channel opened", channel);
+        notify("Chat Channel is opened successfully!");
+        setChatChannel(channel);
+      };
     }
 
     const callData = (await getDoc(calldoc)).data();
@@ -191,6 +198,36 @@ export default function VideoPage() {
     setIsAnswering(false);
     notify("Call Answered Successfully!!!")
   };
+
+  const handleScreenShare = async() => {
+    if (localStream) {
+      const screenStream =await  navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+      setLocalStream(screenStream)
+      if(senderpc){
+        screenStream.getTracks().forEach((track) => senderpc.addTrack(track, screenStream));
+        senderpc.ontrack = (event) => {
+          event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
+        }
+      }else if(answerpc){
+        screenStream.getTracks().forEach((track) => answerpc.addTrack(track, screenStream));
+        answerpc.ontrack = (event) => {
+          event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
+        }
+      }else{
+        console.log("No Peer Connection Found not enntede sender or answer block")
+      }
+      screenStream.getVideoTracks()[0].onended = () => {
+        console.log("Screen sharing stopped");
+        setLocalStream(null);
+      }
+
+    } else {
+      notify("First Get The Camera Access to start Sharing!!!")
+    }
+  }
 
   const endCall = () => {
     senderpc?.close();
@@ -255,47 +292,110 @@ export default function VideoPage() {
             <Phone size={18} /> Answer Call
           </button>
         )}
-
-        <button
-          onClick={endCall}
-          className="flex items-center gap-2 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <PhoneOff size={18} /> End Call
-        </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full md:w-1/2 border-4 border-blue-400 rounded-2xl shadow-lg"
-        />
-        <video
-          ref={remoteVideoRef}
-          autoPlay
-          playsInline
-          className="w-full md:w-1/2 border-4 border-green-400 rounded-2xl shadow-lg"
-        />
+      <div className="relative flex flex-col md:flex-row gap-4 justify-center items-center">
+        <div className="relative w-full md:w-1/2">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full border-4 border-blue-400 rounded-2xl shadow-lg"
+          />
+          {/* Controls over Local Video */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
+            {/* Toggle Video */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                if (localStream) {
+                  const videoTrack = localStream.getVideoTracks()[0];
+                  videoTrack.enabled = !videoTrack.enabled;
+                  setIsVideoOn(videoTrack.enabled);
+                }
+              }}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+            >
+              {isVideoOn ? (
+                <Video className="text-blue-600 w-6 h-6" />
+              ) : (
+                <VideoOff className="text-red-500 w-6 h-6" />
+              )}
+            </motion.button>
+
+            {/* Toggle Audio */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => {
+                if (localStream) {
+                  const audioTrack = localStream.getAudioTracks()[0];
+                  audioTrack.enabled = !audioTrack.enabled;
+                  setIsAudioOn(audioTrack.enabled);
+                }
+              }}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+            >
+              {isAudioOn ? (
+                <Mic className="text-blue-600 w-6 h-6" />
+              ) : (
+                <MicOff className="text-red-500 w-6 h-6" />
+              )}
+            </motion.button>
+            {/* end call */}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={endCall}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+              aria-label="End Call"
+            >
+              <PhoneOff className="text-blue-600 w-6 h-6" /> 
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleScreenShare}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+              aria-label="End Call"
+            >
+              <ScreenShare className="text-blue-600 w-6 h-6" /> 
+            </motion.button>  
+          </div>
+
+        </div>
+
+        <div className="relative w-full md:w-1/2">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full border-4 border-green-400 rounded-2xl shadow-lg"
+          />
+        </div>
       </div>
+
       <div>
-        {ischatwindowOpen ? (
-            <button onClick={() => handlechatwindow()} className="absolute bottom-20 right-6 bg-red-500 text-white px-4 py-2 rounded-lg shadow-sm transition">
-                Close Chat Window
-            </button>
-        ) : (
-            <button onClick={() => handlechatwindow()} className="absolute bottom-20 right-6 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-sm transition">
-                Open Chat Window
-            </button>
-        )}
-        
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handlechatwindow}
+          className={`fixed bottom-4 right-4 sm:right-6 p-3 rounded-full z-50 shadow-lg transition-colors duration-300 ${ischatwindowOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'
+            }`}
+          title={ischatwindowOpen ? "Close Chat Window" : "Open Chat Window"}
+        >
+          {ischatwindowOpen ? (
+            <X className="text-white w-5 h-5" />
+          ) : (
+            <MessageCircle className="text-white w-5 h-5" />
+          )}
+        </motion.button>
+
+
+
         {ischatwindowOpen && chatChannel ? (
-            <DraggableChatWindow chatChannel={chatChannel} />
-        ):(null)}
+          <DraggableChatWindow chatChannel={chatChannel} />
+        ) : (null)}
 
       </div>
-      <ToastContainer/>
+      <ToastContainer />
     </motion.div>
   );
 }
