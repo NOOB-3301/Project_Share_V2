@@ -452,6 +452,22 @@ export default function VideoPage() {
             playsInline
             className="w-full h-full object-cover border-4 border-blue-400 rounded-2xl shadow-lg"
           />
+                    {/* Controls over Local Video */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => toggleFullScreen(remoteVideoRef as React.RefObject<HTMLVideoElement>)}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+              title="Toggle Fullscreen"
+            >
+              {isFullScreen ? (
+                <Minimize2 className="text-blue-600 w-6 h-6" />
+              ) : (
+                <Maximize2 className="text-blue-600 w-6 h-6" />
+              )}
+            </motion.button>
+
+          </div>
         </div>
       </div>
 
