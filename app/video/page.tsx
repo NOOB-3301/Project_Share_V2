@@ -11,7 +11,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { motion } from "framer-motion";
-import { Video, PhoneCall, PhoneOff, VideoOff, Phone, Mic, MicOff, ScreenShare } from "lucide-react";
+import { Video, PhoneCall, PhoneOff, VideoOff, Phone, Mic, MicOff, ScreenShare, ScreenShareOff } from "lucide-react";
 import { MessageCircle, X } from "lucide-react";
 
 import { toast, ToastContainer } from "react-toastify";
@@ -30,9 +30,13 @@ export default function VideoPage() {
   const [senderpc, setSenderpc] = useState<RTCPeerConnection | null>(null);
   const [answerpc, setAnswerpc] = useState<RTCPeerConnection | null>(null);
 
-
+  //for audio vid buttons
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isAudioOn, setIsAudioOn] = useState(true);
+
+
+  //for screen share state
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
 
   //video management
@@ -71,6 +75,20 @@ export default function VideoPage() {
       audio: true,
     });
     setLocalStream(local);
+    if (senderpc) {
+      local.getTracks().forEach((track) => senderpc.addTrack(track, local));
+      senderpc.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
+      }
+    } else if (answerpc) {
+      local.getTracks().forEach((track) => answerpc.addTrack(track, local));
+      answerpc.ontrack = (event) => {
+        event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
+      }
+    }
+    else {
+      console.log("No Peer Connection Found not enntede sender or answer block")
+    }
   };
 
   const notify = (text: string) => toast(`${text}`)
@@ -199,35 +217,56 @@ export default function VideoPage() {
     notify("Call Answered Successfully!!!")
   };
 
-  const handleScreenShare = async() => {
-    if (localStream) {
-      const screenStream =await  navigator.mediaDevices.getDisplayMedia({
+  const handleScreenShare = async () => {
+    if (!localStream) {
+      notify("First Get The Camera Access to start Sharing!!!");
+      return;
+    }
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
       });
-      setLocalStream(screenStream)
-      if(senderpc){
-        screenStream.getTracks().forEach((track) => senderpc.addTrack(track, screenStream));
-        senderpc.ontrack = (event) => {
-          event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
-        }
-      }else if(answerpc){
-        screenStream.getTracks().forEach((track) => answerpc.addTrack(track, screenStream));
-        answerpc.ontrack = (event) => {
-          event.streams[0].getTracks().forEach((track) => remoteStream?.addTrack(track));
-        }
-      }else{
-        console.log("No Peer Connection Found not enntede sender or answer block")
-      }
-      screenStream.getVideoTracks()[0].onended = () => {
-        console.log("Screen sharing stopped");
-        setLocalStream(null);
-      }
 
-    } else {
-      notify("First Get The Camera Access to start Sharing!!!")
+      // Replace the video track
+      const screenVideoTrack = screenStream.getVideoTracks()[0];
+      const senders = (senderpc || answerpc)?.getSenders();
+      const videoSender = senders?.find(sender => sender.track?.kind === 'video');
+
+      if (videoSender && screenVideoTrack) {
+        await videoSender.replaceTrack(screenVideoTrack);
+        setLocalStream(screenStream);
+        console.log("✅ Screen sharing started");
+
+        screenVideoTrack.onended = async () => {
+          notify("Screen sharing stopped");
+
+
+          // Switch back to camera
+          const camStream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true,
+          });
+          const camTrack = camStream.getVideoTracks()[0];
+
+          if (camTrack && videoSender) {
+            await videoSender.replaceTrack(camTrack);
+            setLocalStream(camStream);
+            console.log("✅ Reverted to webcam");
+          }
+          setIsScreenSharing(false);
+        };
+        setIsScreenSharing(true);
+      } else {
+        console.error("❌ No video sender found or screen track unavailable");
+      }
+    } catch (err) {
+      console.error("❌ Error during screen sharing:", err);
+      notify("Failed to start screen sharing.");
     }
-  }
+  };
+
 
   const endCall = () => {
     senderpc?.close();
@@ -346,19 +385,30 @@ export default function VideoPage() {
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={endCall}
-              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105  transition "
               aria-label="End Call"
             >
-              <PhoneOff className="text-blue-600 w-6 h-6" /> 
+              <PhoneOff className="text-blue-600 hover:text-red-500 w-6 h-6" />
             </motion.button>
-            <motion.button
+            {/* Screen Share */}
+            {isScreenSharing ? (
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={handleScreenShare}
+                className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+                aria-label="End Call"
+              >
+                <ScreenShareOff className="text-red-500 w-6 h-6" />
+              </motion.button>
+
+            ) : (<motion.button
               whileTap={{ scale: 0.9 }}
               onClick={handleScreenShare}
               className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
               aria-label="End Call"
             >
-              <ScreenShare className="text-blue-600 w-6 h-6" /> 
-            </motion.button>  
+              <ScreenShare className="text-blue-600 w-6 h-6" />
+            </motion.button>)}
           </div>
 
         </div>
