@@ -12,3 +12,11 @@ import {
 } from "firebase/firestore";
 
 
+export default function GroupChat() {
+  return (
+    <div>
+      hellow world
+      <h1 className="text-2xl font-bold">Group Chat</h1>
+    </div>
+  )
+}
