@@ -16,6 +16,7 @@ import { MessageCircle, X } from "lucide-react";
 
 import { toast, ToastContainer } from "react-toastify";
 import DraggableChatWindow from "../components/SharePage/ChatWindow";
+import { Maximize2, Minimize2 } from 'lucide-react';
 
 
 export default function VideoPage() {
@@ -42,11 +43,28 @@ export default function VideoPage() {
   //video management
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
 
   const [callId, setCallId] = useState<string | null>(null);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const toggleFullScreen = (ref: React.RefObject<HTMLVideoElement>) => {
+    const videoElement = ref.current;
+    if (!videoElement) return;
+
+    if (!document.fullscreenElement) {
+      videoElement.requestFullscreen?.();
+      setIsFullScreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIsFullScreen(false);
+    }
+  };
+
+
 
   useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -286,52 +304,53 @@ export default function VideoPage() {
 
   return (
     <motion.div
-      className="w-full lg:mt-20 min-h-screen bg-gradient-to-br from-white to-slate-100 p-6"
+      className="w-full lg:mt-20 md:mt-20 min-h-screen bg-gradient-to-br from-white to-slate-100 p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
     >
       <h1 className="text-4xl font-bold text-gray-800 mb-6 text-center"> P2P Video Share</h1>
 
-      <div className="flex flex-wrap justify-center gap-4 mb-8">
-        <button
-          onClick={getWebcam}
-          className="flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-50 border border-blue-500 px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <Video size={18} /> Get Webcam
-        </button>
+      <div className="flex flex-wrap justify-center items-center gap-3 sm:gap-4 mb-10 px-2">
+  <button
+    onClick={getWebcam}
+    className="flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-50 border border-blue-500 px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition duration-300"
+  >
+    <Video size={18} /> <span className="hidden sm:inline">Get Webcam</span>
+  </button>
 
-        <button
-          onClick={createOffer}
-          className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg shadow-sm transition"
-        >
-          <PhoneCall size={18} /> Create Offer
-        </button>
+  <button
+    onClick={createOffer}
+    className="flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-700 px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition duration-300"
+  >
+    <PhoneCall size={18} /> <span className="hidden sm:inline">Make Call</span>
+  </button>
 
-        <input
-          type="text"
-          placeholder="Call ID"
-          value={callId || ""}
-          onChange={(e) => setCallId(e.target.value)}
-          className="px-4 py-2 border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-48"
-        />
+  <input
+    type="text"
+    placeholder="Call ID"
+    value={callId || ""}
+    onChange={(e) => setCallId(e.target.value)}
+    className="px-4 py-2.5 border border-gray-300 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 w-44 sm:w-56 transition"
+  />
 
-        {isAnswering ? (
-          <button
-            disabled
-            className="flex items-center gap-2 bg-gray-400 text-white px-4 py-2 rounded-lg shadow-sm transition cursor-not-allowed"
-          >
-            <Phone size={18} /> Answering...
-          </button>
-        ) : (
-          <button
-            onClick={answerOffer}
-            className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 px-4 py-2 rounded-lg shadow-sm transition"
-          >
-            <Phone size={18} /> Answer Call
-          </button>
-        )}
+  {isAnswering ? (
+    <button
+      disabled
+      className="flex items-center gap-2 bg-gray-400 text-white px-5 py-2.5 rounded-xl shadow-md transition cursor-not-allowed"
+    >
+      <Phone size={18} /> <span className="hidden sm:inline">Answering...</span>
+    </button>
+  ) : (
+    <button
+      onClick={answerOffer}
+      className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition duration-300"
+    >
+      <Phone size={18} /> <span className="hidden sm:inline">Answer Call</span>
+    </button>
+  )}
       </div>
+
 
       <div className="relative flex flex-col md:flex-row gap-4 justify-center items-center">
         <div className="relative w-full md:w-1/2">
@@ -340,7 +359,7 @@ export default function VideoPage() {
             autoPlay
             playsInline
             muted
-            className="w-full border-4 border-blue-400 rounded-2xl shadow-lg"
+            className="w-full h-full object-cover border-4 border-blue-400 rounded-2xl shadow-lg"
           />
           {/* Controls over Local Video */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
@@ -409,6 +428,19 @@ export default function VideoPage() {
             >
               <ScreenShare className="text-blue-600 w-6 h-6" />
             </motion.button>)}
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => toggleFullScreen(localVideoRef as React.RefObject<HTMLVideoElement>)}
+              className="bg-white/80 backdrop-blur p-2 rounded-full shadow hover:scale-105 transition"
+              title="Toggle Fullscreen"
+            >
+              {isFullScreen ? (
+                <Minimize2 className="text-blue-600 w-6 h-6" />
+              ) : (
+                <Maximize2 className="text-blue-600 w-6 h-6" />
+              )}
+            </motion.button>
+
           </div>
 
         </div>
@@ -418,7 +450,7 @@ export default function VideoPage() {
             ref={remoteVideoRef}
             autoPlay
             playsInline
-            className="w-full border-4 border-green-400 rounded-2xl shadow-lg"
+            className="w-full h-full object-cover border-4 border-blue-400 rounded-2xl shadow-lg"
           />
         </div>
       </div>
