@@ -1,36 +1,123 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PeerLink - P2P File Sharing & Video Calls
 
-## Getting Started
+### The hosted url is [PeerLink](https://project-share-v2.vercel.app/)
+PeerLink is a modern web application that enables secure peer-to-peer file sharing and video calls using WebRTC technology. Built with Next.js and Firebase, it offers a seamless experience for real-time communication and file transfer without server intermediaries.
 
-First, run the development server:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+## 🚀 Features
+
+- **P2P File Sharing**
+  - Direct peer-to-peer file transfer
+  - Stream-based transfer for large files
+  - Progress tracking for uploads/downloads
+  - No file size limits
+  - Efficient memory usage with chunks
+
+- **Video Calls**
+  - HD video and audio calls
+  - Screen sharing capability
+  - Camera/microphone controls
+  - Fullscreen mode
+  - Real-time chat during calls
+
+- **Real-time Chat**
+  - Draggable chat window
+  - Instant messaging
+  - Timestamp display
+  - Message history
+
+## 🔧 Technical Architecture
+
+### WebRTC Implementation
+The application uses WebRTC for peer-to-peer connections:
+- Establishes data channels for file transfer and chat
+- Uses STUN servers for NAT traversal
+- Handles ICE candidates for connection establishment
+- Manages media streams for video/audio
+
+### File Transfer Mechanism
+- Uses `streamsaver` for efficient file handling
+- Implements chunk-based streaming (216KB chunks)
+- Handles backpressure for large files
+- Progress tracking for both sender and receiver
+
+### Firebase Integration
+Firebase Firestore is used for:
+- Signaling server for WebRTC
+- Storing and exchanging ICE candidates
+- Managing call metadata
+- Temporary storage of connection information
+
+## 📁 Project Structure
+
+```
+app/
+├── components/
+│   ├── LandingPage/    # Landing page components
+│   ├── SharePage/      # File sharing components
+│   └── Navbar.tsx      # Navigation component
+├── video/              # Video call implementation
+├── share/              # File sharing implementation
+├── groupchat/          # Group chat feature
+└── firebase.ts         # Firebase configuration
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛣️ Routes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/` - Landing page
+- `/share` - File sharing interface
+- `/video` - Video call interface
+- `/groupchat` - Group chat interface (in development)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 💡 How It Works
 
-## Learn More
+### File Sharing
+1. Sender creates a WebRTC offer
+2. Connection established via Firebase signaling
+3. File is read as a stream
+4. Data is chunked and sent through WebRTC data channel
+5. Receiver saves chunks using streamsaver
+6. Progress is tracked in real-time
 
-To learn more about Next.js, take a look at the following resources:
+### Video Calls
+1. Local media stream is acquired
+2. WebRTC peer connection is established
+3. Video/audio tracks are exchanged
+4. Additional data channel for chat is created
+5. Real-time communication begins
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔒 Security
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- End-to-end encryption via WebRTC
+- Direct P2P connections
+- No server storage of files
+- Secure signaling through Firebase
 
-## Deploy on Vercel
+## 🚀 Getting Started
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Clone the repository
+2. Install dependencies:
+```bash
+npm install
+```
+3. Set up Firebase:
+   - Create a Firebase project
+   - Add your Firebase config to `firebase.ts`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. Run the development server:
+```bash
+npm run dev
+```
+
+## 💻 Technical Requirements
+
+- Modern web browser with WebRTC support
+- Node.js 16+
+- Firebase account
+
+## 📝 Notes
+
+- The application uses stream-based file transfer instead of loading entire files into memory, making it suitable for transferring large files
+- Firebase is used only for signaling; all data transfers are peer-to-peer
+- The project uses Next.js 15.3.1 with the new app router
