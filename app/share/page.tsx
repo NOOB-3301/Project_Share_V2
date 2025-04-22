@@ -78,7 +78,7 @@ export default function RoomPage() {
     channel.onopen = () => console.log("Data channel opened");
     chatChannel.onopen = () => console.log("Chat channel opened");
     channel.onmessage = (event) => handleReceiveData(event.data);
-    channel.onmessage = (e) =>{console.log("message from data channel",e)}
+    // channel.onmessage = (e) =>{console.log("message from data channel",e)}
     const callDocRef = doc(collection(db, "calls"));
     const offerCandidates = collection(callDocRef, "offerCandidates");
     const answerCandidates = collection(callDocRef, "answerCandidates");
