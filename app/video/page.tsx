@@ -286,7 +286,7 @@ export default function VideoPage() {
 
   return (
     <motion.div
-      className="w-full min-h-screen bg-gradient-to-br from-white to-slate-100 p-6"
+      className="w-full lg:mt-20 min-h-screen bg-gradient-to-br from-white to-slate-100 p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
